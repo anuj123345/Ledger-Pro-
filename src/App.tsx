@@ -476,13 +476,21 @@ const LedgerAutomationApp = () => {
                                     </CardTitle>
                                     <CardDescription>Real-time transaction tracking with automated balance</CardDescription>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                                    {/* Add Row — shown first on mobile */}
+                                    <Button
+                                        onClick={addTransaction}
+                                        className="transition-all hover:-translate-y-0.5 w-full sm:w-auto"
+                                    >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        + Add Row
+                                    </Button>
+                                    {/* Export buttons — below Add Row on mobile */}
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={exportToExcel}
                                             variant="outline"
-                                            className={`transition-all hover:-translate-y-0.5 ${showSuccess ? 'bg-green-500 text-white border-green-500' : ''
-                                                }`}
+                                            className={`transition-all hover:-translate-y-0.5 flex-1 sm:flex-none ${showSuccess ? 'bg-green-500 text-white border-green-500' : ''}`}
                                         >
                                             <Download className="w-4 h-4 mr-2" />
                                             {showSuccess ? 'Excel Ready' : 'View in Excel'}
@@ -495,13 +503,6 @@ const LedgerAutomationApp = () => {
                                             CSV
                                         </Button>
                                     </div>
-                                    <Button
-                                        onClick={addTransaction}
-                                        className="transition-all hover:-translate-y-0.5"
-                                    >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Row
-                                    </Button>
                                 </div>
                             </CardHeader>
                             <CardContent>
