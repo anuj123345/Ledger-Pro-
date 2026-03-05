@@ -468,7 +468,7 @@ const LedgerAutomationApp = () => {
                         </Card>
 
                         <Card className="border-border shadow-md bg-white dark:bg-card">
-                            <CardHeader className="flex flex-row items-center justify-between">
+                            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
                                 <div>
                                     <CardTitle className="text-primary flex items-center gap-3" style={{ fontFamily: 'Playfair Display, serif' }}>
                                         <span className="text-4xl">Ledger</span>
@@ -476,16 +476,14 @@ const LedgerAutomationApp = () => {
                                     </CardTitle>
                                     <CardDescription>Real-time transaction tracking with automated balance</CardDescription>
                                 </div>
-                                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                                    {/* Add Row — shown first on mobile */}
+                                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                                     <Button
                                         onClick={addTransaction}
                                         className="transition-all hover:-translate-y-0.5 w-full sm:w-auto"
                                     >
                                         <Plus className="w-4 h-4 mr-2" />
-                                        + Add Row
+                                        Add Row
                                     </Button>
-                                    {/* Export buttons — below Add Row on mobile */}
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={exportToExcel}
