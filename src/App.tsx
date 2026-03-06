@@ -36,13 +36,29 @@ interface LedgerRow {
 const LedgerAutomationApp = () => {
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [showWelcome, setShowWelcome] = useState(true);
-    const [accountDetails, setAccountDetails] = useState<AccountDetails>({
-        name: '',
-        email: '',
-        phone: '',
+    const [accountDetails, setAccountDetails] = useState<AccountDetails>(() => {
+        const saved = localStorage.getItem('ledgerAccountDetails');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { console.error('Error parsing details from local storage', e); }
+        }
+        return { name: '', email: '', phone: '' };
     });
 
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [transactions, setTransactions] = useState<Transaction[]>(() => {
+        const saved = localStorage.getItem('ledgerTransactions');
+        if (saved) {
+            try { return JSON.parse(saved); } catch (e) { console.error('Error parsing transactions from local storage', e); }
+        }
+        return [];
+    });
+
+    useEffect(() => {
+        localStorage.setItem('ledgerAccountDetails', JSON.stringify(accountDetails));
+    }, [accountDetails]);
+
+    useEffect(() => {
+        localStorage.setItem('ledgerTransactions', JSON.stringify(transactions));
+    }, [transactions]);
 
     const [selectedCalculation, setSelectedCalculation] = useState<string>('closingBalance');
     const [calculationResult, setCalculationResult] = useState<string>('');
@@ -77,35 +93,7 @@ const LedgerAutomationApp = () => {
         setAccountDetails({ ...accountDetails, [field]: value });
     };
 
-    const { totalDebit, totalCredit, closingBalance, ledgerRows } = useMemo(() => {
-        let runningBalance = 0;
-        let debitSum = 0;
-        let creditSum = 0;
 
-        const rows: LedgerRow[] = transactions.map((t) => {
-            const debit = parseFloat(t.debit) || 0;
-            const credit = parseFloat(t.credit) || 0;
-            debitSum += debit;
-            creditSum += credit;
-            runningBalance = runningBalance - debit + credit;
-
-            return {
-                date: t.date,
-                particulars: t.particulars,
-                debit,
-                credit,
-                balance: Math.abs(runningBalance),
-                drCr: t.overrideDrCr || (runningBalance >= 0 ? 'Cr' : 'Dr'),
-            };
-        });
-
-        return {
-            totalDebit: debitSum,
-            totalCredit: creditSum,
-            closingBalance: runningBalance,
-            ledgerRows: rows,
-        };
-    }, [transactions]);
 
     const runCalculation = () => {
         let result = '';
@@ -135,14 +123,42 @@ const LedgerAutomationApp = () => {
         setCalculationResult(result);
     };
 
-    const exportToExcel = async () => {
+    const exportToExcel = async (monthly = false) => {
         try {
             const ExcelJS = (await import('exceljs')).default;
             const wb = new ExcelJS.Workbook();
-            const ws = wb.addWorksheet('Ledger');
+
+            const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+            const wsName = monthly ? `${currentMonth} Ledger` : 'Ledger';
+            const ws = wb.addWorksheet(wsName);
 
             const cleanName = (accountDetails.name || 'Account').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-            const fileName = `Ledger_${cleanName}.xlsx`;
+            const fileNamePrefix = monthly ? `Monthly_Ledger_${currentMonth}` : `Ledger`;
+            const fileName = `${fileNamePrefix}_${cleanName}.xlsx`;
+
+            // Filter transactions if monthly export is requested
+            const exportTransactions = monthly
+                ? transactions.filter(t => {
+                    if (!t.date) return false;
+                    const tDate = new Date(t.date);
+                    const now = new Date();
+                    return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+                })
+                : transactions;
+
+            // recalculate specifically for this export
+            let exportRunningBalance = parseFloat(openingBalance) || 0;
+            let exportDebitSum = 0;
+            let exportCreditSum = 0;
+
+            const exportLedgerRows = exportTransactions.map(t => {
+                const debit = parseFloat(t.debit) || 0;
+                const credit = parseFloat(t.credit) || 0;
+                exportDebitSum += debit;
+                exportCreditSum += credit;
+                exportRunningBalance = exportRunningBalance - debit + credit;
+                return { drCr: exportRunningBalance >= 0 ? 'Cr' : 'Dr', balance: Math.abs(exportRunningBalance) }
+            });
 
             // Column widths
             ws.columns = [
@@ -203,12 +219,13 @@ const LedgerAutomationApp = () => {
                 top: { style: 'thin' }, left: { style: 'thin' },
                 bottom: { style: 'thin' }, right: { style: 'thin' }
             };
-            transactions.forEach((t, index) => {
-                const rowData = ledgerRows[index] || { drCr: 'Cr', balance: 0 };
+
+            exportTransactions.forEach((t, index) => {
+                const rowData = exportLedgerRows[index] || { drCr: 'Cr', balance: 0 };
                 const debit = parseFloat(t.debit) || 0;
                 const credit = parseFloat(t.credit) || 0;
                 const dataRow = ws.addRow([
-                    t.date || '',
+                    t.date ? new Date(t.date).toLocaleDateString('en-GB') : '',
                     t.particulars || '',
                     Math.floor(debit) || 0,
                     debit > 0 ? Math.round((debit % 1) * 100) : 0,
@@ -243,17 +260,17 @@ const LedgerAutomationApp = () => {
             const summaryTitleRow = ws.addRow(['', 'SUMMARY', '', '', '', '', '', '']);
             summaryTitleRow.getCell(2).style = summaryLabelStyle;
 
-            const debitRow = ws.addRow(['', 'Total Debit', '', '', totalDebit, '', '', '']);
+            const debitRow = ws.addRow(['', 'Total Debit', '', '', exportDebitSum, '', '', '']);
             debitRow.getCell(2).style = summaryLabelStyle;
             debitRow.getCell(5).style = summaryValueStyle;
             debitRow.getCell(5).numFmt = '#,##0.00';
 
-            const creditRow = ws.addRow(['', 'Total Credit', '', '', totalCredit, '', '', '']);
+            const creditRow = ws.addRow(['', 'Total Credit', '', '', exportCreditSum, '', '', '']);
             creditRow.getCell(2).style = summaryLabelStyle;
             creditRow.getCell(5).style = summaryValueStyle;
             creditRow.getCell(5).numFmt = '#,##0.00';
 
-            const balanceRow = ws.addRow(['', 'Closing Balance', '', '', Math.abs(closingBalance), closingBalance >= 0 ? 'Cr' : 'Dr', '', '']);
+            const balanceRow = ws.addRow(['', 'Closing Balance', '', '', Math.abs(exportRunningBalance), exportRunningBalance >= 0 ? 'Cr' : 'Dr', '', '']);
             balanceRow.getCell(2).style = { ...summaryLabelStyle, font: { bold: true, color: { argb: 'FF1F3864' }, name: 'Calibri', size: 11 } };
             balanceRow.getCell(5).style = summaryValueStyle;
             balanceRow.getCell(5).numFmt = '#,##0.00';
@@ -371,6 +388,71 @@ const LedgerAutomationApp = () => {
                 alert(`CSV export failed: ${error}`);
             }
         }
+    };
+
+    const clearMonthlyLogs = () => {
+        const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+        if (window.confirm(`Are you sure you want to clear all logs for ${currentMonth}? Please make sure you have exported the data for analysis first.`)) {
+            // keep transactions that are NOT in the current month
+            const filteredTransactions = transactions.filter(t => {
+                if (!t.date) return false;
+                const tDate = new Date(t.date);
+                const now = new Date();
+                return !(tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear());
+            });
+            setTransactions(filteredTransactions);
+        }
+    };
+
+    const [openingBalance, setOpeningBalance] = useState<string>(() => {
+        const saved = localStorage.getItem('ledgerOpeningBalance');
+        return saved ? saved : '0';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('ledgerOpeningBalance', openingBalance);
+    }, [openingBalance]);
+
+    // calculate values
+    const { totalDebit, totalCredit, closingBalance, ledgerRows } = useMemo(() => {
+        let runningBalance = parseFloat(openingBalance) || 0;
+        let debitSum = 0;
+        let creditSum = 0;
+
+        // Sort transactions by date
+        const sortedTransactions = [...transactions].sort((a, b) => {
+            if (!a.date) return 1;
+            if (!b.date) return -1;
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
+
+        const rows: LedgerRow[] = sortedTransactions.map((t) => {
+            const debit = parseFloat(t.debit) || 0;
+            const credit = parseFloat(t.credit) || 0;
+            debitSum += debit;
+            creditSum += credit;
+            runningBalance = runningBalance - debit + credit;
+
+            return {
+                date: t.date ? new Date(t.date).toLocaleDateString('en-GB') : '',
+                particulars: t.particulars,
+                debit,
+                credit,
+                balance: Math.abs(runningBalance),
+                drCr: t.overrideDrCr || (runningBalance >= 0 ? 'Cr' : 'Dr'),
+            };
+        });
+
+        return {
+            totalDebit: debitSum,
+            totalCredit: creditSum,
+            closingBalance: runningBalance,
+            ledgerRows: rows,
+        };
+    }, [transactions, openingBalance]);
+
+    const compileMonth = () => {
+        exportToExcel(true);
     };
 
     if (showWelcome) {
@@ -513,20 +595,36 @@ const LedgerAutomationApp = () => {
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                                     <Button
-                                        onClick={addTransaction}
+                                        onClick={clearMonthlyLogs}
+                                        variant="destructive"
                                         className="transition-all hover:-translate-y-0.5 w-full sm:w-auto"
                                     >
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Row
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Clear {new Date().toLocaleString('default', { month: 'long' })}
+                                    </Button>
+                                    <Button
+                                        onClick={compileMonth}
+                                        variant="secondary"
+                                        className={`transition-all hover:-translate-y-0.5 bg-blue-100 text-blue-800 hover:bg-blue-200 w-full sm:w-auto`}
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Add up {new Date().toLocaleString('default', { month: 'long' })} Data
                                     </Button>
                                     <div className="flex gap-2">
                                         <Button
-                                            onClick={exportToExcel}
+                                            onClick={addTransaction}
+                                            className="transition-all hover:-translate-y-0.5"
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Row
+                                        </Button>
+                                        <Button
+                                            onClick={() => exportToExcel(false)}
                                             variant="outline"
                                             className={`transition-all hover:-translate-y-0.5 flex-1 sm:flex-none ${showSuccess ? 'bg-green-500 text-white border-green-500' : ''}`}
                                         >
                                             <Download className="w-4 h-4 mr-2" />
-                                            {showSuccess ? 'Excel Ready' : 'View in Excel'}
+                                            {showSuccess ? 'Excel Ready' : 'Export All'}
                                         </Button>
                                         <Button
                                             onClick={exportToCSV}
@@ -744,15 +842,25 @@ const LedgerAutomationApp = () => {
                                     </CardTitle>
                                     <CardDescription>Complete ledger with running balance</CardDescription>
                                 </div>
-                                <Button
-                                    onClick={exportToExcel}
-                                    variant="outline"
-                                    className={`transition-all hover:-translate-y-0.5 ${showSuccess ? 'bg-green-500 text-white border-green-500' : ''
-                                        }`}
-                                >
-                                    <Download className="w-4 h-4 mr-2" />
-                                    {showSuccess ? 'Downloaded!' : 'Export Excel'}
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={clearMonthlyLogs}
+                                        variant="destructive"
+                                        className="transition-all hover:-translate-y-0.5"
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Clear Month
+                                    </Button>
+                                    <Button
+                                        onClick={() => exportToExcel(false)}
+                                        variant="outline"
+                                        className={`transition-all hover:-translate-y-0.5 ${showSuccess ? 'bg-green-500 text-white border-green-500' : ''
+                                            }`}
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        {showSuccess ? 'Downloaded!' : 'Export Excel'}
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="overflow-x-auto">
