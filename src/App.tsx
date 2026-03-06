@@ -816,6 +816,36 @@ const LedgerAutomationApp = () => {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <Card className="border-border shadow-md bg-white dark:bg-card mt-6">
+                            <CardHeader>
+                                <CardTitle className="text-primary" style={{ fontFamily: 'Playfair Display, serif' }}>
+                                    Daily Exports
+                                </CardTitle>
+                                <CardDescription>Download Excel sheets for specific dates</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {uniqueDates.length === 0 ? (
+                                    <div className="text-center text-muted-foreground py-4">
+                                        No transactions available for export.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {uniqueDates.map(date => (
+                                            <Button
+                                                key={date}
+                                                onClick={() => exportToExcel(false, date)}
+                                                variant="outline"
+                                                className="w-full transition-all hover:-translate-y-0.5 border-primary/20 hover:border-primary flex items-center justify-between"
+                                            >
+                                                <span>{date}</span>
+                                                <Download className="w-4 h-4 ml-2 opacity-70" />
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </TabsContent>
 
                     <TabsContent value="summary" className="space-y-6">
@@ -964,36 +994,6 @@ const LedgerAutomationApp = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-border shadow-md bg-white dark:bg-card mt-6">
-                            <CardHeader>
-                                <CardTitle className="text-primary" style={{ fontFamily: 'Playfair Display, serif' }}>
-                                    Daily Exports
-                                </CardTitle>
-                                <CardDescription>Download Excel sheets for specific dates</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {uniqueDates.length === 0 ? (
-                                    <div className="text-center text-muted-foreground py-4">
-                                        No transactions available for export.
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {uniqueDates.map(date => (
-                                            <Button
-                                                key={date}
-                                                onClick={() => exportToExcel(false, date)}
-                                                variant="outline"
-                                                className="w-full transition-all hover:-translate-y-0.5 border-primary/20 hover:border-primary flex items-center justify-between"
-                                            >
-                                                <span>{date}</span>
-                                                <Download className="w-4 h-4 ml-2 opacity-70" />
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>
