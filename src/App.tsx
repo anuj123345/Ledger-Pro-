@@ -62,6 +62,7 @@ const LedgerAutomationApp = () => {
 
     const [selectedCalculation, setSelectedCalculation] = useState<string>('closingBalance');
     const [calculationResult, setCalculationResult] = useState<string>('');
+    const [selectedExportDate, setSelectedExportDate] = useState<string>('');
     const [showSuccess, setShowSuccess] = useState(false);
 
     useEffect(() => {
@@ -830,18 +831,29 @@ const LedgerAutomationApp = () => {
                                         No transactions available for export.
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                        {uniqueDates.map(date => (
-                                            <Button
-                                                key={date}
-                                                onClick={() => exportToExcel(false, date)}
-                                                variant="outline"
-                                                className="w-full transition-all hover:-translate-y-0.5 border-primary/20 hover:border-primary flex items-center justify-between"
+                                    <div className="flex flex-col sm:flex-row gap-4 items-end max-w-md">
+                                        <div className="space-y-2 flex-1">
+                                            <Label htmlFor="date-select">Select Date</Label>
+                                            <select
+                                                id="date-select"
+                                                value={selectedExportDate}
+                                                onChange={(e) => setSelectedExportDate(e.target.value)}
+                                                className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                             >
-                                                <span>{date}</span>
-                                                <Download className="w-4 h-4 ml-2 opacity-70" />
-                                            </Button>
-                                        ))}
+                                                <option value="" disabled>Choose a date...</option>
+                                                {uniqueDates.map(date => (
+                                                    <option key={date} value={date}>{date}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <Button
+                                            onClick={() => selectedExportDate && exportToExcel(false, selectedExportDate)}
+                                            disabled={!selectedExportDate}
+                                            className="transition-all hover:-translate-y-0.5"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Download Excel
+                                        </Button>
                                     </div>
                                 )}
                             </CardContent>
