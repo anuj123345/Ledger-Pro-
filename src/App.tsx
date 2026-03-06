@@ -95,6 +95,37 @@ const LedgerAutomationApp = () => {
     };
 
 
+    const activeMonthInfo = useMemo(() => {
+        if (transactions.length === 0) {
+            const now = new Date();
+            return {
+                name: now.toLocaleString('default', { month: 'long' }),
+                month: now.getMonth(),
+                year: now.getFullYear()
+            };
+        }
+
+        // Find the latest transaction date
+        const latestTransaction = [...transactions]
+            .filter(t => t.date)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+        if (!latestTransaction) {
+            const now = new Date();
+            return {
+                name: now.toLocaleString('default', { month: 'long' }),
+                month: now.getMonth(),
+                year: now.getFullYear()
+            };
+        }
+
+        const date = new Date(latestTransaction.date);
+        return {
+            name: date.toLocaleString('default', { month: 'long' }),
+            month: date.getMonth(),
+            year: date.getFullYear()
+        };
+    }, [transactions]);
 
     const runCalculation = () => {
         let result = '';
@@ -129,7 +160,7 @@ const LedgerAutomationApp = () => {
             const ExcelJS = (await import('exceljs')).default;
             const wb = new ExcelJS.Workbook();
 
-            const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+            const monthName = activeMonthInfo.name;
             let wsName = 'Ledger';
             let fileNamePrefix = 'Ledger';
 
@@ -137,8 +168,8 @@ const LedgerAutomationApp = () => {
                 wsName = `${targetDate} Ledger`;
                 fileNamePrefix = `Daily_Ledger_${targetDate.replace(/\//g, '-')}`;
             } else if (monthly) {
-                wsName = `${currentMonth} Ledger`;
-                fileNamePrefix = `Monthly_Ledger_${currentMonth}`;
+                wsName = `${monthName} Ledger`;
+                fileNamePrefix = `Monthly_Ledger_${monthName}`;
             }
             const ws = wb.addWorksheet(wsName);
 
@@ -156,8 +187,7 @@ const LedgerAutomationApp = () => {
 
                 if (monthly) {
                     const tDate = new Date(t.date);
-                    const now = new Date();
-                    return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+                    return tDate.getMonth() === activeMonthInfo.month && tDate.getFullYear() === activeMonthInfo.year;
                 }
 
                 return true;
@@ -408,14 +438,13 @@ const LedgerAutomationApp = () => {
     };
 
     const clearMonthlyLogs = () => {
-        const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-        if (window.confirm(`Are you sure you want to clear all logs for ${currentMonth}? Please make sure you have exported the data for analysis first.`)) {
-            // keep transactions that are NOT in the current month
+        const monthName = activeMonthInfo.name;
+        if (window.confirm(`Are you sure you want to clear all logs for ${monthName}? Please make sure you have exported the data for analysis first.`)) {
+            // keep transactions that are NOT in the active month
             const filteredTransactions = transactions.filter(t => {
                 if (!t.date) return false;
                 const tDate = new Date(t.date);
-                const now = new Date();
-                return !(tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear());
+                return !(tDate.getMonth() === activeMonthInfo.month && tDate.getFullYear() === activeMonthInfo.year);
             });
             setTransactions(filteredTransactions);
         }
@@ -632,7 +661,7 @@ const LedgerAutomationApp = () => {
                                         className="transition-all hover:-translate-y-0.5 w-full sm:w-auto"
                                     >
                                         <Trash2 className="w-4 h-4 mr-2" />
-                                        Clear {new Date().toLocaleString('default', { month: 'long' })}
+                                        Clear {activeMonthInfo.name}
                                     </Button>
                                     <Button
                                         onClick={compileMonth}
@@ -640,7 +669,7 @@ const LedgerAutomationApp = () => {
                                         className={`transition-all hover:-translate-y-0.5 bg-blue-100 text-blue-800 hover:bg-blue-200 w-full sm:w-auto`}
                                     >
                                         <Download className="w-4 h-4 mr-2" />
-                                        Add up {new Date().toLocaleString('default', { month: 'long' })} Data
+                                        Add up {activeMonthInfo.name} Data
                                     </Button>
                                     <div className="flex gap-2">
                                         <Button
