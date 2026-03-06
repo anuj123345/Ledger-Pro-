@@ -123,28 +123,44 @@ const LedgerAutomationApp = () => {
         setCalculationResult(result);
     };
 
-    const exportToExcel = async (monthly = false) => {
+    const exportToExcel = async (monthly = false, targetDate?: string) => {
         try {
             const ExcelJS = (await import('exceljs')).default;
             const wb = new ExcelJS.Workbook();
 
             const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-            const wsName = monthly ? `${currentMonth} Ledger` : 'Ledger';
+            let wsName = 'Ledger';
+            let fileNamePrefix = 'Ledger';
+
+            if (targetDate) {
+                wsName = `${targetDate} Ledger`;
+                fileNamePrefix = `Daily_Ledger_${targetDate.replace(/\//g, '-')}`;
+            } else if (monthly) {
+                wsName = `${currentMonth} Ledger`;
+                fileNamePrefix = `Monthly_Ledger_${currentMonth}`;
+            }
             const ws = wb.addWorksheet(wsName);
 
             const cleanName = (accountDetails.name || 'Account').replace(/[^a-z0-9]/gi, '_').substring(0, 30);
-            const fileNamePrefix = monthly ? `Monthly_Ledger_${currentMonth}` : `Ledger`;
             const fileName = `${fileNamePrefix}_${cleanName}.xlsx`;
 
-            // Filter transactions if monthly export is requested
-            const exportTransactions = monthly
-                ? transactions.filter(t => {
-                    if (!t.date) return false;
+            // Filter transactions if monthly export or targetDate is requested
+            const exportTransactions = transactions.filter(t => {
+                if (!t.date) return false;
+                const tDateStr = new Date(t.date).toLocaleDateString('en-GB');
+
+                if (targetDate) {
+                    return tDateStr === targetDate;
+                }
+
+                if (monthly) {
                     const tDate = new Date(t.date);
                     const now = new Date();
                     return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-                })
-                : transactions;
+                }
+
+                return true;
+            });
 
             // recalculate specifically for this export
             let exportRunningBalance = parseFloat(openingBalance) || 0;
@@ -454,6 +470,21 @@ const LedgerAutomationApp = () => {
     const compileMonth = () => {
         exportToExcel(true);
     };
+
+    const uniqueDates = useMemo(() => {
+        const dates = new Set<string>();
+        transactions.forEach(t => {
+            if (t.date) {
+                dates.add(new Date(t.date).toLocaleDateString('en-GB'));
+            }
+        });
+        return Array.from(dates).sort((a, b) => {
+            // sort descending (newest first based on parsed en-GB format)
+            const [dayA, monthA, yearA] = a.split('/');
+            const [dayB, monthB, yearB] = b.split('/');
+            return new Date(`${yearB}-${monthB}-${dayB}`).getTime() - new Date(`${yearA}-${monthA}-${dayA}`).getTime();
+        });
+    }, [transactions]);
 
     if (showWelcome) {
         return (
@@ -933,6 +964,36 @@ const LedgerAutomationApp = () => {
                                         </tbody>
                                     </table>
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-border shadow-md bg-white dark:bg-card mt-6">
+                            <CardHeader>
+                                <CardTitle className="text-primary" style={{ fontFamily: 'Playfair Display, serif' }}>
+                                    Daily Exports
+                                </CardTitle>
+                                <CardDescription>Download Excel sheets for specific dates</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {uniqueDates.length === 0 ? (
+                                    <div className="text-center text-muted-foreground py-4">
+                                        No transactions available for export.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {uniqueDates.map(date => (
+                                            <Button
+                                                key={date}
+                                                onClick={() => exportToExcel(false, date)}
+                                                variant="outline"
+                                                className="w-full transition-all hover:-translate-y-0.5 border-primary/20 hover:border-primary flex items-center justify-between"
+                                            >
+                                                <span>{date}</span>
+                                                <Download className="w-4 h-4 ml-2 opacity-70" />
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>
